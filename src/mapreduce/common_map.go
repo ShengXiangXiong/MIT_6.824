@@ -1,7 +1,10 @@
 package mapreduce
 
 import (
+	"bufio"
+	"encoding/json"
 	"hash/fnv"
+	"os"
 )
 
 func doMap(
@@ -53,6 +56,34 @@ func doMap(
 	//
 	// Your code here (Part I).
 	//
+
+	//read file data into contents
+	contents := ""
+	f, _ := os.Open(inFile)
+	inputScanner := bufio.NewScanner(f)
+	//similar while boolean
+	for inputScanner.Scan() {
+		contents += inputScanner.Text() + " "
+	}
+
+	kvs := mapF(jobName, contents)
+	file2kv := make(map[string][]KeyValue)
+	for _, kv := range kvs {
+		//partition KeyValues into diffrent file by key mod nReduce
+		//then ReduceTask r only dispose the r'th intermediate file's KeyValues
+		r := ihash(kv.Key) % nReduce
+		fileName := reduceName(jobName, mapTask, r)
+		file2kv[fileName] = append(file2kv[fileName], kv)
+	}
+	for file, kvs := range file2kv {
+		f, _ := os.Create(file)
+		enc := json.NewEncoder(f)
+		for _, kv := range kvs {
+			enc.Encode(&kv)
+		}
+		f.Close()
+	}
+
 }
 
 func ihash(s string) int {
