@@ -118,7 +118,8 @@ func makeInputs(num int) []string {
 
 // Cook up a unique-ish UNIX-domain socket name
 // in /var/tmp. can't use current directory since
-// AFS doesn't support UNIX-domain sockets.
+// AFS(Distributed File System,similar hdfs) doesn't
+// support UNIX-domain sockets(support multi pc not sigle pc(UNIX-domain)).
 func port(suffix string) string {
 	s := "/var/tmp/824-"
 	s += strconv.Itoa(os.Getuid()) + "/"
@@ -160,7 +161,11 @@ func TestSequentialMany(t *testing.T) {
 }
 
 func TestParallelBasic(t *testing.T) {
+	//start master server and distributed task on workers that register with the master over RPC.
 	mr := setup()
+	//sets up a connection with the master, registers its address, and waits for tasks to be scheduled.
+	//RunWorker is a goroutine,because if a worker does not get a task for the time being, it can be
+	//temporarily blocked and then dispose the next worker, via this goroutine implements the concurrency requirement
 	for i := 0; i < 2; i++ {
 		go RunWorker(mr.address, port("worker"+strconv.Itoa(i)),
 			MapFunc, ReduceFunc, -1, nil)

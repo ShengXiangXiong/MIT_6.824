@@ -2,7 +2,6 @@ package mapreduce
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"sort"
 )
@@ -52,6 +51,8 @@ func doReduce(
 	// Your code here (Part I).
 	//
 	// file2kv := make(map[string][]KeyValue)
+
+	//merge:merge KeyValue pair of the r'th intermediate file for all map task into key2v
 	key2v := make(map[string][]string)
 	for i := 0; i < nMap; i++ {
 		//supposing reduceTask equals r,reduce task r collects the r'th intermediate file from each map task,
@@ -65,7 +66,6 @@ func doReduce(
 			kv := KeyValue{}
 			err := dec.Decode(&kv)
 			if err != nil {
-				fmt.Println("Decoder failed", err.Error())
 				break
 			}
 			kvs = append(kvs, kv)
