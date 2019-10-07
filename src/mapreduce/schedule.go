@@ -36,22 +36,49 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 
 	//schedule() must wait for a worker to finish before it can give it another task
 	//otherwise endless loop case if certain task not excuted by worker successfully
+
+	//Using Channel to simulate semaphores
+	sem := make(chan int, ntasks)
+
 	var wg sync.WaitGroup
+	taskArgsChan := make(chan interface{}, ntasks)
+
 	for i := 0; i < ntasks; i++ {
 		wg.Add(1)
-		//get worker rpc address
+		//add taskArgsChan
+		taskArgsChan <- DoTaskArgs{jobName, mapFiles[i], phase, i, n_other}
+		//intital semaphore
+		sem <- 1
+	}
+
+	for len(sem) > 0 {
 		workerAddr := <-registerChan
-		//set taskArgs
-		taskArgs := DoTaskArgs{jobName, mapFiles[i], phase, i, n_other}
-		//send RPCs to the workers in parallel so that the workers can work on tasks concurrently
+		taskArgs := <-taskArgsChan
+		if taskArgs == nil {
+			fmt.Printf("finish\n")
+			break
+		}
 		go func() {
 			ok := call(workerAddr, "Worker.DoTask", taskArgs, nil)
 			if ok {
+				<-sem
 				wg.Done()
+				fmt.Printf("success work %v\n", taskArgs)
+				//must write conditional interpretation here
+				if len(sem) == 0 {
+					taskArgsChan <- nil
+				}
 				registerChan <- workerAddr
+			} else {
+				//the master should re-assign the task given to the failed worker to another worker
+				taskArgsChan <- taskArgs
 			}
+			//fail when write conditional interpretation, can't understand why
+			// if len(sem) == 0 {
+			// 	taskArgsChan <- nil
+			// 	fmt.Printf("--------------------------success work %v\n", taskArgs)
+			// }
 		}()
-		fmt.Printf("%d/%d\n", i, ntasks)
 	}
 	//wait until all task completed for this phase
 	wg.Wait()
